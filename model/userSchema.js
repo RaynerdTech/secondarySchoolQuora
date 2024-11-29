@@ -72,9 +72,24 @@ const UserSchema = new Schema(
       upvotes: { type: Boolean, default: true },
       badges: { type: Boolean, default: true },
     },
-    preferredCategories: {
+   preferredCategories: {
       type: [String],
-      default: [],
+      default: ['Mathematics', 'English Language'], // Default must match values in the enum
+      enum: {
+        values: [
+          'Mathematics', 
+          'English Language', 
+          'Biology', 
+          'Chemistry', 
+          'Physics', 
+          'Accounting', 
+          'Government', 
+          'Literature', 
+          'Economics', 
+          'History'
+        ],
+        message: '{VALUE} is not a valid category', // Optional: Custom error message for enum validation
+      },
     },
     badgeData: {
       badgesEarned: { type: Number, default: 0 },
