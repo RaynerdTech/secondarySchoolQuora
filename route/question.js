@@ -8,8 +8,8 @@ const router = express.Router();
 router.get('/questions', getAllQuestions);
 router.post('/create-question', verify, postQuestion);   
 router.get('/question/:id', getQuestionById);
-router.delete('/delete-question/:id', deleteQuestion);
-router.put('/update-question/:id', updateQuestion);
+router.delete('/delete-question/:id', verify, deleteQuestion);
+router.put('/update-question/:id', verify, updateQuestion);
 
    
 module.exports = router; 
