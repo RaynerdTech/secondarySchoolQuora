@@ -9,6 +9,7 @@ const UserSchema = new Schema(
       type: String,
       unique: true,
       trim: true,
+      required: true
     },
     email: {
       type: String,
@@ -72,7 +73,7 @@ const UserSchema = new Schema(
       upvotes: { type: Boolean, default: true },
       badges: { type: Boolean, default: true },
     },
-   preferredCategories: {
+    preferredCategories: {
       type: [String],
       default: ['Mathematics', 'English Language'], // Default must match values in the enum
       enum: {

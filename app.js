@@ -3,6 +3,7 @@ const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const authRoutes = require('./route/auth');
 const userRoutes = require('./route/user');
+const questionRoutes = require('./route/question');
 const dotenv = require('dotenv');
 const cors = require('cors');
 
@@ -19,6 +20,7 @@ app.use(cors())
 // Routes
 app.use(authRoutes);
 app.use(userRoutes);
+app.use(questionRoutes);
 
 mongoose.connect(process.env.MONGO_URL)
   .then(() => console.log("Mongoose is connected"))
