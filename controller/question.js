@@ -86,6 +86,7 @@ const getQuestionById = async (req, res) => {
     try {
       const { id } = req.params; // Extract question ID from the route params
       const { content, subject, tags } = req.body; // Extract fields from the request body
+      const { username } = req.user; // Extract the username from the JWT payload
   
       // Validate that required fields are not empty
       if (!content || !subject) {
@@ -97,16 +98,24 @@ const getQuestionById = async (req, res) => {
         return res.status(400).json({ error: "You can only provide up to 3 tags." });
       }
   
+      // Find the question by ID
+      const question = await Question.findById(id);
+  
+      if (!question) {
+        return res.status(404).json({ error: "Question not found." });
+      }
+  
+      // Check if the user attempting to update the question is the owner
+      if (question.user.username !== username) {
+        return res.status(403).json({ error: "You are not authorized to update this question." });
+      }
+  
       // Update the question
       const updatedQuestion = await Question.findByIdAndUpdate(
         id,
         { content, subject, tags }, // Fields to update
         { new: true, runValidators: true } // Return the updated document and apply schema validation
       );
-  
-      if (!updatedQuestion) {
-        return res.status(404).json({ error: "Question not found." });
-      }
   
       res.status(200).json({ message: "Question updated successfully", updatedQuestion });
     } catch (error) {
@@ -116,18 +125,28 @@ const getQuestionById = async (req, res) => {
   };
   
   
+  
 
   //DELETE QUESTION 
   const deleteQuestion = async (req, res) => {
     const { id } = req.params; // Get the question ID from the URL parameters
+    const { username } = req.user; // Extract the username from the JWT payload
   
     try {
-      // Attempt to delete the question by its ID
-      const deletedQuestion = await Question.findByIdAndDelete(id);
+      // Find the question by its ID
+      const question = await Question.findById(id);
   
-      if (!deletedQuestion) {
+      if (!question) {
         return res.status(404).json({ message: "Question not found" });
       }
+  
+      // Check if the user attempting to delete the question is the owner
+      if (question.user.username !== username) {
+        return res.status(403).json({ message: "You are not authorized to delete this question" });
+      }
+   
+      // Delete the question
+      await Question.findByIdAndDelete(id);
   
       res.status(200).json({ message: "Question deleted successfully" });
     } catch (error) {
@@ -135,7 +154,6 @@ const getQuestionById = async (req, res) => {
       res.status(500).json({ message: "Server error while deleting question" });
     }
   };
-  
   
 
 module.exports = {postQuestion, getAllQuestions, getQuestionById, deleteQuestion, updateQuestion}
