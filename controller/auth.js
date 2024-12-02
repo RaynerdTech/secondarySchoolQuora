@@ -93,15 +93,7 @@ const registerUser = async (req, res) => {
     const {
       username,
       email,
-      password,
-      bio,
-      avatar,
-      role,
-      notificationPreferences,
-      preferredCategories,
-      badgeData,
-      classGrade,    // Added field
-      schoolName,    // Added field
+      password
     } = req.body;
   
     try {
@@ -111,34 +103,23 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'User already exists' });
       }
   
-      const existingUsername = await User.findOne({ username });
+      const existingUsername = await User.findOne({
+        username: { $regex: new RegExp(`^${username}$`, 'i') }
+      });
+      
       if (existingUsername) {
         return res.status(400).json({ message: 'Username not available' });
       }
+      
   
       // Create a new user
       const user = new User({
         username,
         email,
-        password,
-        bio,
-        avatar,
-        role: role || 'student', // Default role
-        notificationPreferences: {
-          newAnswers: notificationPreferences?.newAnswers ?? true,
-          upvotes: notificationPreferences?.upvotes ?? true,
-          badges: notificationPreferences?.badges ?? true,
-        },
-        preferredCategories: preferredCategories || [],
-        badgeData: {
-          badgesEarned: badgeData?.badgesEarned || 0,
-          badgeLevels: badgeData?.badgeLevels || [],
-          progress: badgeData?.progress || {},
-        },
-        classGrade,   // Added field
-        schoolName,   // Added field
-        verified: false,  // Default to false, assuming email verification needs to be done
+        password
       });
+
+      console.log(user)
   
       // Save the user to the database
       await user.save();
@@ -189,58 +170,78 @@ const registerUser = async (req, res) => {
   
 
 // Login User
-const loginUser = async (req, res) => {
-    const { email, username, password } = req.body;
-  
-    try {
-      // Find the user by email or username
-      const user = await User.findOne({
-        $or: [{ email }, { username }],
-      });
-  
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+     const isValidEmail = (email) => {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    };
+    
+    const loginUser = async (req, res) => {
+      const { email, username, password } = req.body;
+      console.log('Login password:', password);
+    
+      try {
+        // Determine if the input is an email or username
+        let user;
+        if (isValidEmail(email) || username) {
+          // Search by email if valid
+          if (isValidEmail(email)) {
+            user = await User.findOne({
+              email: email.trim().toLowerCase(),
+            });
+          } else {
+            // Search by username if not an email
+            user = await User.findOne({
+              username: username.trim(),
+            });
+          }
+        }
+    
+        console.log('User found:', user);
+    
+        // If no user is found
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+    
+        // Check if the password matches
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log('Password valid:', isPasswordValid); // Debugging log
+        if (!isPasswordValid) {
+          return res.status(401).json({ message: 'Invalid credentials' });
+        }
+    
+        // Update lastLogin
+        user.lastLogin = new Date();
+        await user.save();
+    
+        // Generate a JWT token
+        const token = jwt.sign(
+          { id: user._id, role: user.role, username: user.username },
+          process.env.JWT_SECRET,
+          { expiresIn: '1d' }
+        );
+    
+        // Set token in cookies
+        res.cookie('user_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'none',
+        });
+    
+        // Respond with success
+        res.status(200).json({
+          message: 'Login successful',
+          user: {
+            lastLogin: user.lastLogin,
+          },
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
       }
-  
-      // Check if the password matches
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      console.log('Password valid:', isPasswordValid); // Debugging log
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-  
-      // Update lastLogin
-      user.lastLogin = new Date();
-      await user.save();
-  
-      // Generate a JWT token
-      const token = jwt.sign(
-        { id: user._id, role: user.role, username: user.username },
-        process.env.JWT_SECRET,
-        { expiresIn: '1d' }
-      );
-  
-      // Set token in cookies
-      res.cookie('user_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'none',
-      });
-  
-      // Respond with success
-      res.status(200).json({
-        message: 'Login successful',
-        user: {
-          lastLogin: user.lastLogin,
-        },
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  };
+    };
 
-   
+             
 //LOGOUT 
 const logout = (req, res) => {
     try {
@@ -276,7 +277,7 @@ const authRegister = async (req, res) => {
   }
 
   try {
-    // Check if the user already exists
+    // Check if the email already exists
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -287,10 +288,19 @@ const authRegister = async (req, res) => {
       }
 
       // If the user exists and is not a credential account, log them in
-      const aboutUser = { id: existingUser.id, role: existingUser.role };
+      const aboutUser = { id: existingUser.id, role: existingUser.role, username: existingUser.username };
       const token = jwt.sign(aboutUser, process.env.JWT_SECRET, { expiresIn: '12h' });
       res.cookie("user_token", token, { httpOnly: true, sameSite: 'none' });
       return res.status(200).json({ message: "Login successful" });
+    }
+
+    // Check if the username already exists (case-insensitive)
+    const existingUsername = await User.findOne({
+      username: { $regex: new RegExp(`^${username.trim()}$`, 'i') }, // Case-insensitive regex search
+    });
+
+    if (existingUsername) {
+      return res.status(400).json({ message: "Username not available" });
     }
 
     // Create a new user
@@ -308,14 +318,13 @@ const authRegister = async (req, res) => {
       schoolName,   // Added field
       verified: false,  // Default to false, assuming email verification needs to be done
       credentialAccount: true, // Mark as a credential account
+      lastLogin: new Date(),
     });
 
     const savedUser = await newUser.save();
 
-
     // Send verification email to the user
     await sendVerificationEmail(savedUser); // Send email verification after user registration
-  
 
     // Create a token for the newly registered user
     const aboutUser = { id: savedUser.id, role: savedUser.role };
@@ -337,5 +346,6 @@ module.exports = {
   loginUser,
   logout,
   authRegister,
-  verifyEmail
+  verifyEmail,
+  sendVerificationEmail 
 };
