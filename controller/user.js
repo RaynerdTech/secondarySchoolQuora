@@ -14,8 +14,10 @@ const getUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Fetch all questions posted by the user, sorted in chronological order
-    const questions = await Question.find({ "user.username": user.username }).sort({ createdAt: 1 });
+    // Fetch all questions posted by the user and populate their username and avatar
+    const questions = await Question.find({ user: userId })
+      .sort({ createdAt: 1 })
+      .populate('user', 'username avatar'); // Populate the user field with username and avatar
 
     // Respond with the user's profile and their questions
     res.status(200).json({
@@ -28,6 +30,8 @@ const getUserProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+
 
   // Get user by username
   const getUser = async (req, res) => {
@@ -43,8 +47,9 @@ const getUserProfile = async (req, res) => {
         return res.status(404).json({ error: "User not found" });
       }
   
-      // Fetch all questions associated with the user's username, sorted chronologically
-      const questions = await Question.find({ "user.username": username }).sort({ createdAt: 1 });
+      // Fetch all questions associated with the user's ID, sorted chronologically
+      const questions = await Question.find({ user: fetchedUser._id }).sort({ createdAt: -1 })
+      .populate('user', 'username avatar'); // Populate the user field with username and avatar
   
       // Respond with the user data and their questions
       res.status(200).json({
@@ -57,6 +62,7 @@ const getUserProfile = async (req, res) => {
       res.status(500).json({ error: "Failed to retrieve user and questions" });
     }
   };
+
   
   
   const updatePassword = async (req, res) => {
@@ -227,12 +233,36 @@ const getUserProfile = async (req, res) => {
       res.status(500).json({ message: "Failed to update user info" });
     }
   };
+  
+  
+  const getRecentContributions = async (req, res) => {
+    try {
+      const userId = req.user.id; // Extract user ID from the verified token
+  
+      // Fetch questions posted by the authenticated user, sorted by most recent
+      const questions = await Question.find({ user: userId }) // Match the user ID
+        .sort({ createdAt: -1 }) // Sort by the latest questions
+        .populate("user", "username avatar"); // Populate the username for display
+  
+      if (!questions || questions.length === 0) {
+        return res.status(404).json({ success: false, message: "No questions found for this user" });
+      }
+  
+      res.status(200).json({ success: true, questions });
+    } catch (err) {
+      console.error("Error fetching recent contributions:", err);
+      res.status(500).json({ success: false, message: "Server error while fetching recent contributions" });
+    } 
+  };
+  
+  
 
   module.exports = {
     getUserProfile,
     getUser,
     updatePassword,
     updateRole,
-    updateUserInfo
+    updateUserInfo,
+    getRecentContributions
   };
   

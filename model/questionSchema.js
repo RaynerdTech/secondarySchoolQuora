@@ -39,8 +39,11 @@ const questionSchema = new mongoose.Schema({
   },
   
   user: {
-    username: { type: String, required: true }, // Store only the username
+    type: mongoose.Schema.Types.ObjectId,  // Referencing the User model
+    ref: 'User',  // Referencing the User model
+    required: true,
   },
+
   createdAt: {
     type: Date,
     default: Date.now,
