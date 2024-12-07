@@ -15,7 +15,11 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors())
+app.use(
+  cors({
+    origin: "https://edu-connect-7fh6.vercel.app", // Replace with your frontend URL
+    credentials: true, // Allow cookies to be sent and received
+  }));
 
 // Routes
 app.use(authRoutes);
