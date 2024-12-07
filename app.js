@@ -17,9 +17,14 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "https://edu-connect-7fh6.vercel.app", // Replace with your frontend URL
+    origin: [
+      'https://edu-connect-7fh6.vercel.app', 
+      'http://localhost:5173'
+    ],
     credentials: true, // Allow cookies to be sent and received
-  }));
+  })
+);
+
 
 // Routes
 app.use(authRoutes);
