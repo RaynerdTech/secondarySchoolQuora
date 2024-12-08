@@ -90,40 +90,33 @@ const sendVerificationEmail = async (user) => {
 
 // Register User
 const registerUser = async (req, res) => {
-    const {
+  const { username, email, password } = req.body;
+
+  try {
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    const existingUsername = await User.findOne({
+      username: { $regex: new RegExp(`^${username}$`, 'i') },
+    });
+
+    if (existingUsername) {
+      return res.status(400).json({ message: 'Username not available' });
+    }
+
+    // Create a new user
+    const user = new User({
       username,
       email,
-      password
-    } = req.body;
-  
-    try {
-      // Check if user already exists
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'User already exists' });
-      }
-  
-      const existingUsername = await User.findOne({
-        username: { $regex: new RegExp(`^${username}$`, 'i') }
-      });
-      
-      if (existingUsername) {
-        return res.status(400).json({ message: 'Username not available' });
-      }
-      
-  
-      // Create a new user
-      const user = new User({
-        username,
-        email,
-        password
-      });
+      password,
+    });
 
-      console.log(user)
-  
-      // Save the user to the database
-      await user.save();
-  
+    // Save the user to the database
+    await user.save();
+
     // Generate a JWT token
     const token = jwt.sign(
       { id: user._id, role: user.role, username: user.username },
@@ -138,32 +131,34 @@ const registerUser = async (req, res) => {
       sameSite: 'none',
     });
 
+    console.log("Token set in cookie:", token);
 
-      // Send verification email to the user
-      await sendVerificationEmail(user); // Send email verification after user registration
-  
-      // Respond with user info (excluding password)
-      res.status(201).json({
-        message: 'Registration successful, please verify your email.',
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          bio: user.bio,
-          avatar: user.avatar,
-          role: user.role,
-          notificationPreferences: user.notificationPreferences,
-          preferredCategories: user.preferredCategories,
-          badgeData: user.badgeData,
-          classGrade: user.classGrade,  // Added field
-          schoolName: user.schoolName,  // Added field
-        },
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Internal Server Error' });
-    }
-  };
+    // Send verification email to the user
+    await sendVerificationEmail(user);
+
+    // Respond with user info and the token
+    res.status(201).json({
+      message: 'Registration successful, please verify your email.',
+      token, // Include the token in the response
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        bio: user.bio,
+        avatar: user.avatar,
+        role: user.role,
+        notificationPreferences: user.notificationPreferences,
+        preferredCategories: user.preferredCategories,
+        badgeData: user.badgeData,
+        classGrade: user.classGrade, // Added field
+        schoolName: user.schoolName, // Added field
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+};
   
   
   
@@ -231,6 +226,7 @@ const registerUser = async (req, res) => {
         // Respond with success
         res.status(200).json({
           message: 'Login successful',
+          token,
           user: {
             lastLogin: user.lastLogin,
           },
@@ -240,6 +236,7 @@ const registerUser = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
       }
     };
+
 
              
 //LOGOUT 
