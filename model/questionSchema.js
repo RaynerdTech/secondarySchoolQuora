@@ -7,19 +7,8 @@ const questionSchema = new mongoose.Schema({
     maxlength: 300,
   },
   subject: {
-    type: String,
-    enum: [
-      "Mathematics",
-      "English Language",
-      "Biology",
-      "Chemistry",
-      "Physics",
-      "Accounting",
-      "Government",
-      "Literature",
-      "Economics",
-      "History",
-    ],
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category', // Reference to the Category schema
     required: true,
   },
   tags: {

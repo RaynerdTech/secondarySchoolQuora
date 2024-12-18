@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../model/userSchema');
 const nodemailer = require('nodemailer');
-
+const { OAuth2Client } = require('google-auth-library');
 
 
 // Send email verification link
@@ -21,7 +21,7 @@ const sendVerificationEmail = async (user) => {
   
     const mailOptions = {
       from: process.env.EMAIL,
-      to: user.email,
+      to: user.email,       
       subject: 'Email Verification',
       html: `
       <p>Thank you for registering on our platform.</p>
@@ -29,7 +29,7 @@ const sendVerificationEmail = async (user) => {
       <a href="${verificationUrl}" target="_blank">Click here to verify your account</a>
       <p>If you did not request this, please ignore this email.</p>
     `, // Use 'html' for rich-text content
-    };
+    }; 
   
     try {
         const info = await transporter.sendMail(mailOptions);
@@ -159,6 +159,7 @@ const registerUser = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
   
   
   
@@ -172,7 +173,6 @@ const registerUser = async (req, res) => {
     
     const loginUser = async (req, res) => {
       const { email, username, password } = req.body;
-      console.log('Login password:', password);
     
       try {
         // Determine if the input is an email or username
@@ -198,11 +198,18 @@ const registerUser = async (req, res) => {
           return res.status(404).json({ message: 'User not found' });
         }
     
-        // Check if the password matches
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        console.log('Password valid:', isPasswordValid); // Debugging log
-        if (!isPasswordValid) {
-          return res.status(401).json({ message: 'Invalid credentials' });
+        // Check if the account is a credential account
+        if (user.credentialAccount) {
+          // For credential accounts, only email or username is required
+          if (!email && !username) {
+            return res.status(400).json({ message: 'Email or username is required' });
+          }
+        } else {
+          // For non-credential accounts, validate the password
+          const isPasswordValid = await bcrypt.compare(password, user.password);
+          if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+          }
         }
     
         // Update lastLogin
@@ -236,7 +243,7 @@ const registerUser = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
       }
     };
-
+    
 
              
 //LOGOUT 
@@ -253,47 +260,57 @@ const logout = (req, res) => {
 };  
 
 
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); // Your Google Client ID
+
 const authRegister = async (req, res) => {
-  const {
-    username,
-    email,
-    gender,
-    bio,
-    avatar,
-    role = 'student', // Default role
-    notificationPreferences,
-    preferredCategories,
-    badgeData,
-    classGrade,    // Added field
-    schoolName,    // Added field
-  } = req.body;
+  const { idToken, username, email } = req.body;
 
   // Validate required fields
-  if (!email) {
+  if (!idToken || !email || !username) {
     return res.status(400).json({ message: "All required fields must be provided" });
   }
 
   try {
+    // Verify the idToken using Google's OAuth2Client
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID, // Your Google Client ID
+    });
+
+    const payload = ticket.getPayload();
+    const googleUserId = payload.sub; // Google user ID (unique)
+
     // Check if the email already exists
-    const existingUser = await User.findOne({ email });
+    let existingUser = await User.findOne({ email });
 
     if (existingUser) {
+      // If the user exists and is already a Google credential account, log them in
       if (existingUser.credentialAccount) {
+        const aboutUser = { id: existingUser.id, role: existingUser.role, username: existingUser.username };
+        const token = jwt.sign(aboutUser, process.env.JWT_SECRET, { expiresIn: '12h' });
+
+        // Set token in cookies
+        res.cookie("user_token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'none',
+        });
+
+        return res.status(200).json({
+          message: "Login successful",
+          token,
+          user: existingUser,
+        });
+      } else {
         return res.status(400).json({
           message: "Illegal parameters: User already exists as a credential account",
         });
       }
-
-      // If the user exists and is not a credential account, log them in
-      const aboutUser = { id: existingUser.id, role: existingUser.role, username: existingUser.username };
-      const token = jwt.sign(aboutUser, process.env.JWT_SECRET, { expiresIn: '12h' });
-      res.cookie("user_token", token, { httpOnly: true, sameSite: 'none' });
-      return res.status(200).json({ message: "Login successful" });
     }
 
     // Check if the username already exists (case-insensitive)
     const existingUsername = await User.findOne({
-      username: { $regex: new RegExp(`^${username.trim()}$`, 'i') }, // Case-insensitive regex search
+      username: { $regex: new RegExp(`^${username.trim()}$`, 'i') },
     });
 
     if (existingUsername) {
@@ -304,16 +321,7 @@ const authRegister = async (req, res) => {
     const newUser = new User({
       username,
       email,
-      gender,
-      bio,
-      avatar,
-      role,
-      notificationPreferences,
-      preferredCategories,
-      badgeData,
-      classGrade,   // Added field
-      schoolName,   // Added field
-      verified: false,  // Default to false, assuming email verification needs to be done
+      googleUserId, // Store Google user ID
       credentialAccount: true, // Mark as a credential account
       lastLogin: new Date(),
     });
@@ -321,21 +329,30 @@ const authRegister = async (req, res) => {
     const savedUser = await newUser.save();
 
     // Send verification email to the user
-    await sendVerificationEmail(savedUser); // Send email verification after user registration
+    await sendVerificationEmail(savedUser);
 
     // Create a token for the newly registered user
-    const aboutUser = { id: savedUser.id, role: savedUser.role };
+    const aboutUser = { id: savedUser.id, role: savedUser.role, username: savedUser.username };
     const token = jwt.sign(aboutUser, process.env.JWT_SECRET, { expiresIn: '12h' });
 
     // Set the cookie securely
-    res.cookie("user_token", token, { httpOnly: true, sameSite: 'strict' });
+    res.cookie("user_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+    });
 
-    return res.status(201).json({ message: "User created and login successful" });
+    return res.status(201).json({
+      message: "Registration successful, please verify your email.",
+      token,
+      user: savedUser,
+    });
   } catch (error) {
     console.error("Error during registration:", error);
     return res.status(500).json({ message: "Server error. Please try again later." });
   }
 };
+
 
   
 module.exports = {

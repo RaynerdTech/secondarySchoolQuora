@@ -15,7 +15,7 @@ const UserSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      trim: true,  
+      trim: true,
       validate: {
         validator: function (v) {
           return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -73,25 +73,12 @@ const UserSchema = new Schema(
       upvotes: { type: Boolean, default: true },
       badges: { type: Boolean, default: true },
     },
-    preferredCategories: {
-      type: [String],
-      default: ['Mathematics', 'English Language'], // Default must match values in the enum
-      enum: {
-        values: [
-          'Mathematics', 
-          'English Language', 
-          'Biology', 
-          'Chemistry', 
-          'Physics', 
-          'Accounting', 
-          'Government', 
-          'Literature', 
-          'Economics', 
-          'History'
-        ],
-        message: '{VALUE} is not a valid category', // Optional: Custom error message for enum validation
+    preferredCategories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category', // Reference to Category schema
       },
-    },
+    ],
     badgeData: {
       badgesEarned: { type: Number, default: 0 },
       badgeLevels: { type: [String], default: [] },

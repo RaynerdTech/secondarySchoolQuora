@@ -265,4 +265,3 @@ const getUserProfile = async (req, res) => {
     updateUserInfo,
     getRecentContributions
   };
-  
