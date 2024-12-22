@@ -355,11 +355,95 @@ const authRegister = async (req, res) => {
 
 
   
+// Send Password Reset Email
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetUrl = `${process.env.BASE_URL}/reset-password/${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: user.email,
+      subject: 'Password Reset Request',
+      html: `
+        <p>You requested to reset your password.</p>
+        <p>Click the link below to reset your password:</p>
+        <a href="${resetUrl}" target="_blank">Reset Password</a>
+        <p>If you did not request this, please ignore this email.</p>
+      `,
+    }; 
+
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Password reset link sent to your email.' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { newPassword, confirmPassword } = req.body;
+
+  // Ensure the new passwords match
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ message: 'Passwords do not match' });
+  }
+
+  try {
+    // Verify the token and decode user ID
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Compare the new password with the old one in the database
+    const isPasswordSame = await bcrypt.compare(newPassword, user.password);
+
+    if (isPasswordSame) {
+      return res.status(400).json({ message: 'New password cannot be the same as the old password' });
+    }
+
+    // Update the password directly without re-hashing it
+    user.password = newPassword; // Directly set the new password (no hashing)
+    
+    // Save the updated password to the database
+    await user.save();
+
+    res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (error) {
+    console.error('Error during password reset:', error);
+    res.status(400).json({ message: 'Invalid or expired token.' });
+  }
+};
+
+
+
+  
 module.exports = {
   registerUser,
   loginUser,
   logout,
   authRegister,
   verifyEmail,
-  sendVerificationEmail 
+  sendVerificationEmail,
+  resetPassword,
+  forgotPassword
 };
