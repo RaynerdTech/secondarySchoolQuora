@@ -74,8 +74,8 @@ const sendVerificationEmail = async (user) => {
       user.verified = true;
       await user.save();
   
-      //redirect user to login 
-      res.redirect('/login'); 
+      // Redirect to the login page after successful verification
+      res.redirect('https://edu-connect-7fh6.vercel.app/sign-in');
     } catch (error) {
       console.error('Email verification failed:', error.message);
       res.status(500).json({
