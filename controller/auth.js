@@ -74,10 +74,8 @@ const sendVerificationEmail = async (user) => {
       user.verified = true;
       await user.save();
   
-      // Respond with success
-      res.status(200).json({
-        message: `🎉 Welcome aboard, ${user.username || 'user'}! Your email has been verified successfully. You can now log in and enjoy the full experience.`,
-      });
+      //redirect user to login 
+      res.redirect('/login'); 
     } catch (error) {
       console.error('Email verification failed:', error.message);
       res.status(500).json({
