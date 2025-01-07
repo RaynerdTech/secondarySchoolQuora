@@ -20,6 +20,6 @@ router.get('/verify-email/:verificationToken', verifyEmail);
 router.post('/forgot-password', forgotPassword);
 
 // Route for resetting the password
-router.post('/reset-password/:token', resetPassword);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
