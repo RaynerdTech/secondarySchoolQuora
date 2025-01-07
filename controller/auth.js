@@ -364,7 +364,7 @@ const forgotPassword = async (req, res) => {
     }
 
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    const resetUrl = `${process.env.BASE_URL}/reset-password/${resetToken}`;
+    const resetUrl = `https://edu-connect-7fh6.vercel.app/forgot-password3?token=${resetToken}`;;
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -395,7 +395,7 @@ const forgotPassword = async (req, res) => {
 };
 
 const resetPassword = async (req, res) => {
-  const { token } = req.params;
+  const { token } = req.query;
   const { newPassword, confirmPassword } = req.body;
 
   // Ensure the new passwords match
@@ -431,6 +431,7 @@ const resetPassword = async (req, res) => {
     res.status(400).json({ message: 'Invalid or expired token.' });
   }
 };
+
 
 
 
