@@ -236,7 +236,7 @@ const registerUser = async (req, res) => {
             lastLogin: user.lastLogin,
           },
         });
-        res.redirect('https://edu-connect-7fh6.vercel.app/dash-board');
+        // res.redirect('https://edu-connect-7fh6.vercel.app/dash-board');
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
