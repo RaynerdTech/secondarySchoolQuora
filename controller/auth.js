@@ -65,7 +65,7 @@ const sendVerificationEmail = async (user) => {
   
       // Check if the user's email is already verified
       if (user.verified) {
-        return res.status(400).json({
+          res.status(400).json({
           message: "Great news! Your email is already verified. You can log in and start exploring.",
         });
         res.redirect('https://edu-connect-7fh6.vercel.app/sign-in');
