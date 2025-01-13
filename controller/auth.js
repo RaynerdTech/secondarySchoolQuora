@@ -164,83 +164,65 @@ const registerUser = async (req, res) => {
   
 
 // Login User
-     const isValidEmail = (email) => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email);
-    };
-    
-    const loginUser = async (req, res) => {
-      const { email, username, password } = req.body;
-    
-      try {
-        // Determine if the input is an email or username
-        let user;
-        if (isValidEmail(email) || username) {
-          // Search by email if valid
-          if (isValidEmail(email)) {
-            user = await User.findOne({
-              email: email.trim().toLowerCase(),
-            });
-          } else {
-            // Search by username if not an email
-            user = await User.findOne({
-              username: username.trim(),
-            });
-          }
-        }
-    
-        console.log('User found:', user);
-    
-        // If no user is found
-        if (!user) {
-          return res.status(404).json({ message: 'User not found' });
-        }
-    
-        // Check if the account is a credential account
-        if (user.credentialAccount) {
-          // For credential accounts, only email or username is required
-          if (!email && !username) {
-            return res.status(400).json({ message: 'Email or username is required' });
-          }
-        } else {
-          // For non-credential accounts, validate the password
-          const isPasswordValid = await bcrypt.compare(password, user.password);
-          if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-          }
-        }
-    
-        // Update lastLogin
-        user.lastLogin = new Date();
-        await user.save();
-    
-        // Generate a JWT token
-        const token = jwt.sign(
-          { id: user._id, role: user.role, username: user.username },
-          process.env.JWT_SECRET,
-          { expiresIn: '1d' }
-        );
-    
-        // Set token in cookies
-        res.cookie('user_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'none',
-        });
-    
-        // Respond with success
-        res.status(200).json({
-          message: 'Login successful',
-          token,
-          user: {
-            lastLogin: user.lastLogin,
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-      }
-    };
+const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+
+    // Check if user exists
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Update last login time
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // Set token in cookies
+    res.cookie('user_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+    });
+
+    // Respond with token, user details, and redirect URL
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        lastLogin: user.lastLogin,
+      },
+      redirectUrl: 'https://edu-connect-7fh6.vercel.app/dash-board',
+    });
+  } catch (error) {
+    console.error('Error during login:', error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
     
 
              
